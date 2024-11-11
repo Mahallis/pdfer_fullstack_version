@@ -36,18 +36,23 @@ async def compress_file(
     grayscale: bool = False,
     dpi: int = 100,
     quality: int = 60,
-):
+) -> FileResponse:
     try:
         tmp_dir = BASE_DIR / str(uuid4())
         makedirs(tmp_dir, exist_ok=True)
-        final_file_path = await compress_pdf(
-            {"grayscale": grayscale, "dpi": int(dpi), "quality": int(quality)},
-            files,
-            tmp_dir
+
+        result_path = await compress_pdf(
+            params={
+                "grayscale": grayscale,
+                "dpi": int(dpi),
+                "quality": int(quality)
+            },
+            files=files,
+            tmp_dir=tmp_dir
         )
         return FileResponse(
-            path=final_file_path,
-            filename=final_file_path.name
+            path=result_path,
+            filename=result_path.name
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
