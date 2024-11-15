@@ -1,0 +1,29 @@
+.themeActived {
+  animation-duration: 2s;
+  animation-name: activateTheme;
+  animation-timing-function: ease-in-out;
+}
+
+@keyframes activateTheme {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.themeDisabled {
+  animation-duration: 2s;
+  animation-name: deactivateTheme;
+  animation-timing-function: ease-in-out;
+}
+
+@keyframes deactivateTheme {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}

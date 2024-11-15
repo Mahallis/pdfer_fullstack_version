@@ -1,8 +1,10 @@
-from fastapi import UploadFile
+from datetime import datetime
 from zipfile import ZipFile
 from pathlib import Path
-
+from fastapi import UploadFile
 from pdf2image.pdf2image import convert_from_bytes
+
+from validators import validate_file_extension
 
 
 async def compress_pdf(
@@ -12,12 +14,16 @@ async def compress_pdf(
     jpg images, reducing their quality and then merging into one pdf file"""
 
     if len(files) == 1:
-        return await _pdf_to_img_compress(tmp_dir, params, files[0])
+        file: UploadFile = files[0]
+        if validate_file_extension(Path(file.filename or '')):
+            return await _pdf_to_img_compress(tmp_dir, params, file)
+
     archive_path = tmp_dir / 'compressed.zip'
     with ZipFile(archive_path, "w") as archive:
         for file in files:
-            pdf_path = await _pdf_to_img_compress(tmp_dir, params, file)
-            archive.write(pdf_path, arcname=pdf_path.name)
+            if validate_file_extension(Path(file.filename or '')):
+                pdf_path = await _pdf_to_img_compress(tmp_dir, params, file)
+                archive.write(pdf_path, arcname=pdf_path.name)
     return archive_path
 
 
@@ -26,7 +32,8 @@ async def _pdf_to_img_compress(
 ) -> Path:
     """Converts pdf to jpg, compresses it and converts it back"""
 
-    pdf_path = file_path / f"{file.filename[0:-4]}_compressed.pdf"
+    filename = file.filename or f'file_{datetime.now()}'
+    pdf_path = file_path / f"{filename[0:-4]}_compressed.pdf"
     loaded_file = await file.read()
 
     page_image = convert_from_bytes(
