@@ -23,7 +23,7 @@ export default function CompressForm() {
     const formData = new FormData(event.target);
 
     try {
-      const response = await fetch("http://localhost:8000/compress/", {
+      const response = await fetch("http://backend:8000/compress/", {
         method: "POST",
         body: formData,
       });
