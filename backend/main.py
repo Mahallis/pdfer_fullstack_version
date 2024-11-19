@@ -9,12 +9,13 @@ from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from .compress import compress_pdf
+from compress import compress_pdf
 
 app = FastAPI()
 
 origins = [
-    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
 ]
 
 app.add_middleware(

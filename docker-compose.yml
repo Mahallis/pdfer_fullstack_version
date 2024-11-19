@@ -1,0 +1,23 @@
+volumes:
+  static:
+
+services:
+  backend:
+    container_name: pdfer-backend
+    build: ./backend
+  frontend:
+    container_name: pdfer-frontend
+    build: ./frontend
+    command: cp -r /app/build/. /static/
+    volumes:
+      - static:/static
+  nginx:
+    container_name: pdfer-gateaway
+    build: ./gateaway
+    ports:
+      - "8000:80"
+    volumes:
+      - static:/staticfiles
+    depends_on:
+      - backend
+      - frontend
