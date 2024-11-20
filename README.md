@@ -32,7 +32,7 @@
 sudo docker compose up
 ```
 
-2. По умолчанию проект будет доступент по адресу <a href="http://localhost:80">http://localhost:80</a>
+2. По умолчанию проект будет доступент по адресу <a href="http://localhost:8000">http://localhost:8000</a>
 
 ## Планы по доработке проекта
 
