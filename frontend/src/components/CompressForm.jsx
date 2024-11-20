@@ -35,10 +35,10 @@ export default function CompressForm() {
       const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = downloadUrl;
-      a.download =
-        "zip" in blob.type.split("/")
-          ? "compressed_file.pdf"
-          : "compressed.zip";
+      let files_info = formData.getAll("files");
+      a.download = blob.type.split("/").includes("zip")
+        ? `${files_info.length}_files_compressed.zip`
+        : `${files_info[0].name.slice(0, -4)}_compressed.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();

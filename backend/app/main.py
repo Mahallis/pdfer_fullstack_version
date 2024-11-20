@@ -9,7 +9,7 @@ from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from compress import compress_pdf
+from app.compress import compress_pdf
 
 app = FastAPI()
 
@@ -26,7 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-BASE_DIR = Path(__file__).resolve().parent / "pdfs"
+BASE_DIR = Path(__file__).resolve().parent.parent / "pdfs"
 makedirs(BASE_DIR, exist_ok=True)
 
 

@@ -8,7 +8,6 @@ export default function ProgressPopup({ modalState, setModalState }) {
     if (modalState.animation === "progress" && modalState.isTriggered) {
       const interval = setInterval(() => {
         setDots((prevDots) => (prevDots.length < 3 ? prevDots + "." : "."));
-        console.log("done");
       }, 1000);
       return () => clearInterval(interval); // Очищаем интервал при размонтировании
     }

@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import UploadFile
 from pdf2image.pdf2image import convert_from_path
 
-from validators import validate_file_extension
+from app.validators import validate_file_extension
 
 
 async def compress_pdf(
