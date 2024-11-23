@@ -52,14 +52,14 @@ async def _pdf_to_img_convert(
         output_file='page',
         fmt='jpg'
     )
-    return await _img_to_pdf_compress(
+    return _img_to_pdf_compress(
         images_dir,
         form['quality'],
         compressed_pdf_path
     )
 
 
-async def _img_to_pdf_compress(
+def _img_to_pdf_compress(
     images_dir: Path,
     quality: int,
     compressed_pdf_path: Path
@@ -73,18 +73,14 @@ async def _img_to_pdf_compress(
     }
     image_files = sorted(images_dir.glob('page*.jpg'))
 
-    for num, image_file in enumerate(image_files):
-        with Image.open(image_file) as img:
-            img = img.convert('RGB')
-            if num == 0:
-                img.save(
-                    **pillow_params,
-                    append_images=[]
-                )
-            img.save(
-                **pillow_params,
-                append_images=[img],
-                append=True
-            )
+    with Image.open(image_files[0]) as first_img:
+        first_img = first_img.convert('RGB')
+        append_images = (
+            Image.open(img).convert('RGB') for img in image_files[1:]
+        )
+        first_img.save(
+            **pillow_params,
+            append_images=append_images
+        )
 
     return compressed_pdf_path
