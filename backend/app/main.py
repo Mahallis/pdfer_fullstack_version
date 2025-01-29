@@ -9,7 +9,7 @@ from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from app.compress import compress_pdf
+from .compress import compress_pdf
 
 app = FastAPI()
 
@@ -34,22 +34,15 @@ makedirs(BASE_DIR, exist_ok=True)
 async def compress_file(
     background_tasks: BackgroundTasks,
     files: Annotated[List[UploadFile], File],
-    quality: Annotated[int, Form(ge=0, le=70)],
-    dpi: Annotated[int, Form(ge=100, le=150)],
-    grayscale: Annotated[bool, Form()] = False,
+    compression: Annotated[int, Form(ge=69, le=150)],
 ) -> FileResponse:
 
     tmp_dir = BASE_DIR / str(uuid4())
     try:
         makedirs(tmp_dir, exist_ok=True)
-        params = {
-            "grayscale": grayscale,
-            "dpi": int(dpi),
-            "quality": int(quality)
-        }
 
         result_path = await compress_pdf(
-            params=params,
+            compression=int(compression),
             files=files,
             tmp_dir=tmp_dir
         )

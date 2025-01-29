@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN apk update && \
     apk upgrade --no-cache && \
-    apk add poppler-utils
+    apk add ghostscript
 
 COPY requirements.txt .
 

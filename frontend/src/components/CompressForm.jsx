@@ -2,17 +2,17 @@ import { useState } from "react";
 import ProgressPopup from "./ProgressPopup/ProgressPopup";
 
 export default function CompressForm() {
-  const dpi = [
-    { value: "100", label: "Низкое" },
-    { value: "150", label: "Нормальное" },
+  const compression = [
+    { value: "150", label: "Минимальное сжатие", selected: false },
+    { value: "100", label: "Нормальное сжатие", selected: true },
+    { value: "69", label: "Экстремальное сжатие", selected: false },
   ];
 
-  const [currentQuality, setCurrentQuality] = useState(30);
   const [modalState, setModalState] = useState({
     isTriggered: false,
     status: "",
     animation: "progress",
-  }); // change this hook to modalState and combine it with action state
+  });
   const [isDragging, setIsDragging] = useState(false);
 
   const onSubmitForm = async (event) => {
@@ -70,10 +70,10 @@ export default function CompressForm() {
     <>
       <ProgressPopup modalState={modalState} setModalState={setModalState} />
       <div className="card col-xl-6 position-relative">
-        <h3 className="text-center card-header">Сжатие pdf файлов</h3>
+        <h3 className="text-center card-header">Уменьшение размера pdf файлов</h3>
         <div className="card-body d-flex flex-column">
           <h6 className=" text-center card-title mb-3">
-            Чем ниже разрешение и качество, тем меньше размер итогового файла
+            Чем выше степень сжатия, тем меньше размер итогового файла
           </h6>
           <form
             className="container"
@@ -89,61 +89,24 @@ export default function CompressForm() {
             onDragOver={(event) => event.preventDefault()}
           >
             <div className="row">
-              <div className="col-3">
-                <div className="form-check form-switch">
-                  <input
-                    id="grayscale"
-                    role="switch"
-                    className="form-check-input"
-                    type="checkbox"
-                    name="grayscale"
-                  />
-                  <label htmlFor="grayscale" className="form-check-label">
-                    Серый цвет
-                  </label>
-                </div>
-              </div>
-              <div className="col-9">
+              <div className="col">
                 <div className="form-floating">
                   <select
                     id="floatingSelect"
                     className="form-select"
-                    aria-label="dpi"
-                    name="dpi"
+                    aria-label="compression"
+                    name="compression"
                   >
-                    {dpi.map((option) => {
+                    {compression.map((option) => {
                       return (
-                        <option key={option.value} value={option.value}>
+                        <option key={option.value} value={option.value} selected={option.selected}> 
                           {option.label}
                         </option>
                       );
                     })}
                   </select>
-                  <label htmlFor="floatingSelect">Разрешение файла</label>
+                  <label htmlFor="floatingSelect">Степень сжатия</label>
                 </div>
-              </div>
-            </div>
-            <div className="row">
-              <div className="col">
-                <label htmlFor="quality" className="form-label">
-                  Качество
-                  <span className="badge text-bg-primary mx-2">
-                    {currentQuality}
-                  </span>
-                </label>
-                <input
-                  type="range"
-                  className="form-range"
-                  min="0"
-                  max="70"
-                  step="10"
-                  id="quality"
-                  name="quality"
-                  value={currentQuality}
-                  onChange={(event) => {
-                    setCurrentQuality(event.target.value);
-                  }}
-                />
               </div>
             </div>
             <div className="row">
