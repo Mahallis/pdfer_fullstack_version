@@ -3,7 +3,8 @@ from fastapi import status
 from fastapi.exceptions import HTTPException
 
 
-def validate_file_extension(filename: Path):
+def validate_file_extension(filename: Path) -> Path:
+    """Validates filename extension"""
     if str(filename.suffix).lower() != '.pdf':
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

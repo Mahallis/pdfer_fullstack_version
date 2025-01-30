@@ -13,7 +13,7 @@ from .compress import compress_pdf
 
 app = FastAPI()
 
-origins = [
+origins: list[str] = [
     "http://localhost:8000",
     "http://localhost:3000",
 ]
@@ -26,7 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-BASE_DIR = Path(__file__).resolve().parent.parent / "pdfs"
+BASE_DIR: Path = Path(__file__).resolve().parent.parent / "pdfs"
 makedirs(BASE_DIR, exist_ok=True)
 
 
@@ -41,7 +41,7 @@ async def compress_file(
     try:
         makedirs(tmp_dir, exist_ok=True)
 
-        result_path = await compress_pdf(
+        result_path: Path = await compress_pdf(
             compression=int(compression),
             files=files,
             tmp_dir=tmp_dir
