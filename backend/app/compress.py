@@ -1,6 +1,7 @@
 import subprocess
-from zipfile import ZipFile
 from pathlib import Path
+from zipfile import ZipFile
+
 from fastapi import UploadFile, status
 from fastapi.exceptions import HTTPException
 

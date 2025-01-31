@@ -1,8 +1,8 @@
-from uuid import uuid4
 from os import makedirs
-from shutil import rmtree
 from pathlib import Path
+from shutil import rmtree
 from typing import List, Annotated
+from uuid import uuid4
 
 from fastapi import FastAPI, UploadFile, BackgroundTasks, File, Form
 from fastapi.exceptions import HTTPException
