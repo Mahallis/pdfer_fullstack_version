@@ -22,8 +22,9 @@ export default function CompressForm() {
     event.preventDefault();
     const formData = new FormData(event.target);
 
+    // TODO: change behavior to fetch task id, and then check for results 
     try {
-      const response = await fetch("/compress/", {
+      const response = await fetch("/api/compress/", {
         method: "POST",
         body: formData,
       });

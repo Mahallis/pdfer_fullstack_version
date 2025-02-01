@@ -7,9 +7,8 @@ from uuid import uuid4
 from fastapi import FastAPI, UploadFile, BackgroundTasks, File, Form
 from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 
-from .compress import compress_pdf
+from .tasks import compress_pdf
 
 app = FastAPI()
 
@@ -32,25 +31,42 @@ makedirs(BASE_DIR, exist_ok=True)
 
 @app.post("/compress/")
 async def compress_file(
-    background_tasks: BackgroundTasks,
     files: Annotated[List[UploadFile], File],
     compression: Annotated[int, Form(ge=69, le=150)],
-) -> FileResponse:
+) -> dict:
 
     tmp_dir = BASE_DIR / str(uuid4())
     try:
         makedirs(tmp_dir, exist_ok=True)
+        files_data: list[dict] = [{
+            'filename': file.filename or '',
+            'content': await file.read()
+        } for file in files]
 
-        result_path: Path = await compress_pdf(
+        task = compress_pdf.delay(
             compression=int(compression),
-            files=files,
-            tmp_dir=tmp_dir
+            files=files_data,
+            tmp_dir=str(tmp_dir)
         )
-        return FileResponse(
-            path=result_path,
-            filename=result_path.name
-        )
+        return {'task_id': task.id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/task/{task_id}")
+async def get_task_status(
+    background_tasks: BackgroundTasks,
+    task_id: str
+):
+    """Get status of a task"""
+    task = compress_pdf.AsyncResult(task_id)
+    try:
+        if task.state == "PENDING":
+            return {"status": "pending"}
+        elif task.state == "SUCCESS":
+            return {"status": "success", "result": task.result}
+        else:
+            return {"status": "failed", "error": str(task.info)}
     finally:
-        background_tasks.add_task(lambda: rmtree(tmp_dir))
+        if task.state != "PENDING":
+            rmtree(task.result['tmp_dir'])

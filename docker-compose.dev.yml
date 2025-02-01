@@ -1,20 +1,9 @@
 volumes:
-  pdfs:
   static:
   redis_data:
 
 
 services:
-  backend:
-    container_name: pdfer-backend
-    build: ./backend
-    volumes:
-      - pdfs:/app/pdfs/
-    depends_on:
-      - redis
-    environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_BACKEND_URL=redis://redis:6379/0
   frontend:
     container_name: pdfer-frontend
     build: ./frontend
@@ -25,11 +14,11 @@ services:
     container_name: pdfer-gateaway
     build: ./gateaway
     ports:
-      - "8000:80"
+      - "8000:8000"
     volumes:
       - static:/staticfiles
     depends_on:
-      - backend
+      - worker
       - frontend
   redis:
     image: redis:7.2.7-alpine
@@ -40,9 +29,7 @@ services:
   worker:
     container_name: pdfer-worker
     build: ./backend
-    volumes:
-      - pdfs:/app/pdfs/
-    command: celery -A app.tasks worker --loglevel=info
+    command: celery -A celery_app.tasks worker --loglevel=info
     depends_on:
       - redis
     environment:

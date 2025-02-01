@@ -2,35 +2,49 @@ import subprocess
 from pathlib import Path
 from zipfile import ZipFile
 
-from fastapi import UploadFile, status
+from celery import Celery
+from fastapi import status
 from fastapi.exceptions import HTTPException
 
 from .validators import validate_file_extension
+from .dataclasses import UserFile
+
+celery_app = Celery(
+    'compress',
+    broker='redis://redis:6379/0',
+    backend='redis://redis:6379/0'
+)
 
 
-async def compress_pdf(
-    compression: int, files: list[UploadFile], tmp_dir: Path
-) -> Path:
+@celery_app.task
+def compress_pdf(
+    compression: int, files: list[dict], tmp_dir: str
+) -> dict:
     """Sends files to _ghost_compress function, puts them into an
     archive if there is more than one and sends resulting path back to
     FastAPI"""
 
+    dir_path: Path = Path(tmp_dir)
+    normal_file: UserFile
     if len(files) == 1:
-        file: UploadFile = files[0]
-        if validate_file_extension(Path(file.filename or '')):
-            return await _ghost_compress(tmp_dir, compression, file)
+        normal_file = UserFile(**files[0])
+        if validate_file_extension(Path(normal_file.filename or '')):
+            result_path = _ghost_compress(dir_path, compression, normal_file)
+    else:
+        result_path = dir_path / 'compressed.zip'
+        with ZipFile(result_path, "w") as archive:
+            for file in files:
+                normal_file = UserFile(**file)
+                if validate_file_extension(Path(normal_file.filename or '')):
+                    pdf_path = _ghost_compress(
+                        dir_path, compression, normal_file
+                    )
+                    archive.write(pdf_path, arcname=pdf_path.name)
+    return {'result_path': str(result_path), 'tmp_dir': str(dir_path)}
 
-    archive_path: Path = tmp_dir / 'compressed.zip'
-    with ZipFile(archive_path, "w") as archive:
-        for file in files:
-            if validate_file_extension(Path(file.filename or '')):
-                pdf_path = await _ghost_compress(tmp_dir, compression, file)
-                archive.write(pdf_path, arcname=pdf_path.name)
-    return archive_path
 
-
-async def _ghost_compress(
-    tmp_dir: Path, compression: int, file: UploadFile
+def _ghost_compress(
+    tmp_dir: Path, compression: int, file: UserFile
 ) -> Path:
     """Compresses recieved files using ghostscript
     based on compression (dpi) value"""
@@ -40,8 +54,7 @@ async def _ghost_compress(
     original_pdf_path: Path = tmp_dir / filename
 
     with open(original_pdf_path, 'wb') as temp_file:
-        content: bytes = await file.read()
-        temp_file.write(content)
+        temp_file.write(file.content)
 
     gs_command = [
         'gs',
