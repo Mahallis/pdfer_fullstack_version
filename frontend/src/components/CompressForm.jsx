@@ -3,9 +3,9 @@ import ProgressPopup from "./ProgressPopup/ProgressPopup";
 
 export default function CompressForm() {
   const compression = [
-    { value: "150", label: "Минимальное сжатие", selected: false },
-    { value: "100", label: "Нормальное сжатие", selected: true },
     { value: "69", label: "Экстремальное сжатие", selected: false },
+    { value: "100", label: "Нормальное сжатие", selected: true },
+    { value: "150", label: "Максимальное качество", selected: false },
   ];
 
   const [modalState, setModalState] = useState({
@@ -22,10 +22,8 @@ export default function CompressForm() {
   // Функция для скачивания файла
   const downloadFile = (fileData, fileName, mime_type) => {
     try {
-      // 1. Декодируем Base64 в байтовую строку
       const byteString = atob(fileData);
 
-      // 2. Преобразуем байтовую строку в ArrayBuffer
       const arrayBuffer = new ArrayBuffer(byteString.length);
       const uint8Array = new Uint8Array(arrayBuffer);
 
@@ -33,7 +31,6 @@ export default function CompressForm() {
         uint8Array[i] = byteString.charCodeAt(i);
       }
 
-      // 3. Создаем Blob из массива байтов
       const blob = new Blob([uint8Array], { type: mime_type });
       const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -62,12 +59,24 @@ export default function CompressForm() {
       switch (status) {
         case "success":
           clearInterval(intervalID); // Очистка интервала
+          setModalState({
+              isTriggered: true,
+              animation: 'success',
+              status: "Окно будет закрыто через 3 секунды"
+          })
+          setTimeout(() => {
+              setModalState({
+                isTriggered: false,
+                animation: "",
+                status: ""
+              });
+            }, 3000);
           if (file) {
             const fileName = formData.getAll("files").length > 1
-              ? `${formData.getAll("files").length}_files_compressed.zip`
-              : `${formData.getAll("files")[0].name.slice(0, -4)}_compressed.pdf`;
-
-            downloadFile(file, fileName, mime_type);
+            ? `${formData.getAll("files").length}_files_compressed.zip`
+            : `${formData.getAll("files")[0].name.slice(0, -4)}_compressed.pdf`;
+            
+              downloadFile(file, fileName, mime_type);
           } else {
             console.error("Файл не найден в ответе сервера.");
           }
@@ -107,7 +116,7 @@ export default function CompressForm() {
 
     setModalState({
       isTriggered: true,
-      status: "Обработка...",
+      status: "Обработка",
       animation: "progress",
     });
 
@@ -133,14 +142,6 @@ export default function CompressForm() {
         animation: "fail",
         status: "Произошла ошибка при отправке формы",
       });
-    } finally {
-      setTimeout(() => {
-        setModalState({
-          isTriggered: false,
-          status: "",
-          animation: "progress",
-        });
-      }, 3000);
     }
   };
 
