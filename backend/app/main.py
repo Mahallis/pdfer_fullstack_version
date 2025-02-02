@@ -1,3 +1,5 @@
+from base64 import b64encode
+from mimetypes import guess_type
 from os import makedirs
 from pathlib import Path
 from shutil import rmtree
@@ -64,9 +66,23 @@ async def get_task_status(
         if task.state == "PENDING":
             return {"status": "pending"}
         elif task.state == "SUCCESS":
-            return {"status": "success", "result": task.result}
+            result_path: Path = Path(task.result['result_path'])
+            mime_type, _ = guess_type(result_path)
+            if not mime_type:
+                raise ValueError(
+                    f"Не удалось определить MIME-тип для файла: {result_path}"
+                )
+
+            with open(result_path, 'rb') as file:
+                content = file.read()
+                encoded_file = b64encode(content).decode("utf-8")
+            return {
+                'status': 'success',
+                'file': encoded_file,
+                'mime_type': mime_type
+            }
         else:
             return {"status": "failed", "error": str(task.info)}
     finally:
         if task.state != "PENDING":
-            rmtree(task.result['tmp_dir'])
+            background_tasks.add_task(lambda: rmtree(task.result['tmp_dir']))
