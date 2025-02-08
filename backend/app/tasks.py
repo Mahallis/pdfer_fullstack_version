@@ -6,9 +6,6 @@ from celery import Celery
 from fastapi import status
 from fastapi.exceptions import HTTPException
 
-from .validators import validate_file_extension
-from .dataclasses import UserFile
-
 celery_app = Celery(
     'compress',
     broker='redis://redis:6379/0',
@@ -17,44 +14,32 @@ celery_app = Celery(
 
 
 @celery_app.task
-def compress_pdf(
-    compression: int, files: list[dict], tmp_dir: str
-) -> dict:
+def compress_pdf(compression: int, folder_path: str) -> dict:
     """Sends files to _ghost_compress function, puts them into an
     archive if there is more than one and sends resulting path back to
     FastAPI"""
 
-    dir_path: Path = Path(tmp_dir)
-    normal_file: UserFile
+    files: list[Path] = [f for f in Path(folder_path).iterdir()]
     if len(files) == 1:
-        normal_file = UserFile(**files[0])
-        if validate_file_extension(Path(normal_file.filename or '')):
-            result_path = _ghost_compress(dir_path, compression, normal_file)
+        result_path = _ghost_compress(compression, files[0])
     else:
-        result_path = dir_path / 'compressed.zip'
+        result_path = Path(f'{folder_path}/compressed.zip')
         with ZipFile(result_path, "w") as archive:
             for file in files:
-                normal_file = UserFile(**file)
-                if validate_file_extension(Path(normal_file.filename or '')):
-                    pdf_path = _ghost_compress(
-                        dir_path, compression, normal_file
-                    )
-                    archive.write(pdf_path, arcname=pdf_path.name)
-    return {'result_path': str(result_path), 'tmp_dir': str(dir_path)}
+                pdf_path = _ghost_compress(
+                    compression, file
+                )
+                archive.write(pdf_path, arcname=pdf_path.name)
+    return {'result_path': str(result_path)}
 
 
 def _ghost_compress(
-    tmp_dir: Path, compression: int, file: UserFile
+    compression: int, file: Path
 ) -> Path:
     """Compresses recieved files using ghostscript
     based on compression (dpi) value"""
 
-    filename: Path = Path(file.filename or '')
-    compressed_pdf_path: Path = tmp_dir / f"{filename.stem}_compressed.pdf"
-    original_pdf_path: Path = tmp_dir / filename
-
-    with open(original_pdf_path, 'wb') as temp_file:
-        temp_file.write(file.content)
+    compressed_pdf_path: Path = file.parent / f"{file.stem}_compressed.pdf"
 
     gs_command = [
         'gs',
@@ -74,7 +59,7 @@ def _ghost_compress(
         '-dQUIET',
         '-dBATCH',
         f'-sOutputFile={compressed_pdf_path}',
-        str(original_pdf_path)
+        f'{file}'
     ]
     try:
         subprocess.run(gs_command, check=True)
@@ -84,3 +69,25 @@ def _ghost_compress(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f'Error occured: {e}'
         )
+
+
+@celery_app.task
+def assemble_chunks(params: dict):
+    result_path: Path = Path(params['result_path'])
+    chunks_path: Path = Path(params['chunks_path'])
+
+    assembled_path = result_path / params['foldername'] / params['filename']
+    assembled_path.parent.mkdir(parents=True, exist_ok=True)
+    chunks = sorted([
+        file for file in chunks_path.iterdir()
+        if file.name.startswith('chunk_')
+    ])
+    if not len(chunks) == params['total_chunks']:
+        raise Exception('Not enough chunks')
+    with open(f'{assembled_path}', 'wb') as output_file:
+        for chunk in chunks:
+            with open(chunk, 'rb') as chunk_file:
+                output_file.write(chunk_file.read())
+            chunk.unlink()
+    Path(chunks_path).rmdir()
+    return {'status': 'done'}

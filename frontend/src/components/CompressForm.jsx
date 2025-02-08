@@ -7,6 +7,10 @@ export default function CompressForm() {
     { value: "100", label: "Нормальное сжатие", selected: true },
     { value: "150", label: "Максимальное качество", selected: false },
   ];
+  let taskID;
+  let intervalID;
+  let files_folder;
+  let filenames;
 
   const [modalState, setModalState] = useState({
     isTriggered: false,
@@ -16,8 +20,58 @@ export default function CompressForm() {
 
   const [isDragging, setIsDragging] = useState(false);
 
-  let taskID;
-  let intervalID;
+  const generateFolderName = () => {
+    const uuid = crypto.randomUUID()
+    const timestamp = Date.now()
+    return `${uuid}_${timestamp}`
+  }
+
+  const createChunks = (event) => {
+    event.preventDefault()
+    let chunkSize = 1024 * 1024
+    files_folder = generateFolderName()
+    Array.from(event.target.files).forEach(async (file) => {
+      if (file.type === "application/pdf") {
+        let start = 0;
+        let totalChunks = Math.round(file.size / chunkSize)
+        for (let i = 0; i < totalChunks; i++) {
+          const chunk = file.slice(start * chunkSize, (start + 1) * chunkSize);
+          await uploadChunk(chunk, start, totalChunks, file.name, files_folder)
+          start++ 
+        }
+      } else {
+        alert('Вы загрузили не pdf документ.')
+      }
+    })
+  }
+
+  const uploadChunk = async (chunk, index, total_chunks, filename, foldername) => {
+    const formData = new FormData();
+    formData.append('chunk', chunk)
+    formData.append('chunk_index', index)
+    formData.append('total_chunks', total_chunks)
+    formData.append('filename', filename)
+    formData.append('foldername', foldername)
+
+
+    try {
+      const response = await fetch("/api/upload-chunk/", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Ошибка сервера: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log(result)
+
+    } catch (error) {
+      clearInterval(intervalID); // Очистка интервала при ошибке
+      console.error("Ошибка при отправке формы:", error);
+    }
+  }
 
   // Функция для скачивания файла
   const downloadFile = (fileData, fileName, mime_type) => {
@@ -72,9 +126,9 @@ export default function CompressForm() {
               });
             }, 3000);
           if (file) {
-            const fileName = formData.getAll("files").length > 1
-            ? `${formData.getAll("files").length}_files_compressed.zip`
-            : `${formData.getAll("files")[0].name.slice(0, -4)}_compressed.pdf`;
+            const fileName = filenames.length > 1
+            ? `${filenames.length}_files_compressed.zip`
+            : `${filenames.name.slice(0, -4)}_compressed.pdf`;
             
               downloadFile(file, fileName, mime_type);
           } else {
@@ -113,6 +167,10 @@ export default function CompressForm() {
   const onSubmitForm = async (event) => {
     event.preventDefault();
     const formData = new FormData(event.target);
+    filenames = formData.getAll("files")
+    formData.delete('files')
+    formData.append('foldername', files_folder)
+    console.log(formData.entries())
 
     setModalState({
       isTriggered: true,
@@ -198,6 +256,7 @@ export default function CompressForm() {
                   name="files"
                   multiple
                   style={{ border: isDragging && "4px solid red" }}
+                  onChange={createChunks}
                   required
                 />
               </div>

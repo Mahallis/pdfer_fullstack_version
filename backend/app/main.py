@@ -1,16 +1,14 @@
 from base64 import b64encode
 from mimetypes import guess_type
-from os import makedirs
 from pathlib import Path
-from shutil import rmtree
-from typing import List, Annotated
-from uuid import uuid4
+import shutil
+from typing import Annotated
 
 from fastapi import FastAPI, UploadFile, BackgroundTasks, File, Form
 from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from .tasks import compress_pdf
+from .tasks import compress_pdf, assemble_chunks
 
 app = FastAPI()
 
@@ -27,28 +25,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-BASE_DIR: Path = Path(__file__).resolve().parent.parent / "pdfs"
-makedirs(BASE_DIR, exist_ok=True)
+BASE_DIR: Path = Path(__file__).resolve().parent.parent
+PDFS_DIR: Path = BASE_DIR / 'pdfs'
+CHUNKS_DIR: Path = BASE_DIR / 'chunks'
+
+BASE_DIR.mkdir(parents=True, exist_ok=True)
+PDFS_DIR.mkdir(parents=True, exist_ok=True)
+CHUNKS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @app.post("/compress/")
 async def compress_file(
-    files: Annotated[List[UploadFile], File],
     compression: Annotated[int, Form(ge=69, le=150)],
+    foldername: Annotated[str, Form()],
 ) -> dict:
 
-    tmp_dir = BASE_DIR / str(uuid4())
+    folder_path: str = str(PDFS_DIR / foldername)
     try:
-        makedirs(tmp_dir, exist_ok=True)
-        files_data: list[dict] = [{
-            'filename': file.filename or '',
-            'content': await file.read()
-        } for file in files]
-
         task = compress_pdf.delay(
             compression=int(compression),
-            files=files_data,
-            tmp_dir=str(tmp_dir)
+            folder_path=folder_path,
         )
         return {'task_id': task.id}
     except Exception as e:
@@ -61,6 +57,7 @@ async def get_task_status(
     task_id: str
 ):
     """Get status of a task"""
+
     task = compress_pdf.AsyncResult(task_id)
     try:
         if task.state == "PENDING":
@@ -85,4 +82,40 @@ async def get_task_status(
             return {"status": "failed", "error": str(task.info)}
     finally:
         if task.state != "PENDING":
-            background_tasks.add_task(lambda: rmtree(task.result['tmp_dir']))
+            background_tasks.add_task(lambda: shutil.rmtree(Path(task.result['result_path']).parent))
+
+
+@app.post('/upload-chunk/')
+async def upload_chunk(
+    chunk_index: Annotated[int, Form(ge=0)],
+    total_chunks: Annotated[int, Form(ge=1)],
+    filename: Annotated[str, Form()],
+    foldername: Annotated[str, Form()],
+    chunk: UploadFile = File(...),
+):
+    clean_filename: str = filename
+    document_path = CHUNKS_DIR / foldername / clean_filename
+    document_path.mkdir(parents=True, exist_ok=True)
+
+    chunk_path = document_path / f'chunk_{chunk_index}'
+    with open(chunk_path, "wb") as f:
+        f.write(await chunk.read())
+
+    if chunk_index + 1 == total_chunks:
+        task = assemble_chunks.delay({
+            'filename': filename,
+            'chunks_path': str(document_path),
+            'foldername': foldername,
+            'total_chunks': total_chunks,
+            'result_path': str(PDFS_DIR),
+        })
+
+        # TODO: Remove foldername folder compressing
+        return {'task_id': task.id}
+    return {
+        "status": "success",
+        "message": (
+            f'Chunk {clean_filename}:'
+            f'{chunk_index + 1} of {total_chunks} uploaded.'
+            )
+        }
