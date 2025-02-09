@@ -51,7 +51,7 @@ async def compress_file(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/task/{task_id}")
+@app.get("/task/{task_id}/")
 async def get_task_status(
     background_tasks: BackgroundTasks,
     task_id: str
