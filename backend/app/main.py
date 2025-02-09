@@ -97,11 +97,11 @@ async def upload_chunk(
     document_path = CHUNKS_DIR / foldername / clean_filename
     document_path.mkdir(parents=True, exist_ok=True)
 
-    chunk_path = document_path / f'chunk_{chunk_index}'
+    chunk_path = document_path / f'chunk_{chunk_index:03d}'
     with open(chunk_path, "wb") as f:
         f.write(await chunk.read())
 
-    if chunk_index + 1 == total_chunks:
+    if sum(1 for _ in document_path.iterdir()) == total_chunks:
         task = assemble_chunks.delay({
             'filename': filename,
             'chunks_path': str(document_path),

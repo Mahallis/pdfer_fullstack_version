@@ -29,16 +29,18 @@ export default function CompressForm() {
   const createChunks = (event) => {
     event.preventDefault()
     let chunkSize = 1024 * 1024
+    const chunkPromises = []
     files_folder = generateFolderName()
     Array.from(event.target.files).forEach(async (file) => {
       if (file.type === "application/pdf") {
-        let start = 0;
-        let totalChunks = Math.round(file.size / chunkSize)
+        let totalChunks = Math.ceil(file.size / chunkSize)
         for (let i = 0; i < totalChunks; i++) {
-          const chunk = file.slice(start * chunkSize, (start + 1) * chunkSize);
-          await uploadChunk(chunk, start, totalChunks, file.name, files_folder)
-          start++ 
+          const start = i * chunkSize;
+          const end = Math.min((i + 1) * chunkSize, file.size);
+          const chunk = file.slice(start, end);
+          chunkPromises.push(uploadChunk(chunk, i, totalChunks, file.name, files_folder))
         }
+        await Promise.all(chunkPromises)
       } else {
         alert('Вы загрузили не pdf документ.')
       }
@@ -94,6 +96,7 @@ export default function CompressForm() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(downloadUrl);
+      window.location.reload()
     } catch (error) {
       console.error("Ошибка при скачивании файла:", error);
     }
@@ -128,7 +131,7 @@ export default function CompressForm() {
           if (file) {
             const fileName = filenames.length > 1
             ? `${filenames.length}_files_compressed.zip`
-            : `${filenames.name.slice(0, -4)}_compressed.pdf`;
+            : `${filenames[0].name.slice(0, -4)}_compressed.pdf`;
             
               downloadFile(file, fileName, mime_type);
           } else {
@@ -170,7 +173,6 @@ export default function CompressForm() {
     filenames = formData.getAll("files")
     formData.delete('files')
     formData.append('foldername', files_folder)
-    console.log(formData.entries())
 
     setModalState({
       isTriggered: true,
