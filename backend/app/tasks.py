@@ -39,7 +39,8 @@ def _ghost_compress(
     """Compresses recieved files using ghostscript
     based on compression (dpi) value"""
 
-    compressed_pdf_path: Path = file.parent / f"{file.stem}_compressed.pdf"
+    result_filename: str = f"{file.stem}_compressed.pdf"
+    compressed_pdf_path: Path = file.parent.parent / result_filename
 
     gs_command = [
         'gs',
@@ -79,8 +80,7 @@ def assemble_chunks(params: dict):
     result_path: Path = Path(params['result_path'])
     chunks_path: Path = Path(params['chunks_path'])
 
-    assembled_path = result_path / params['foldername'] / params['filename']
-    assembled_path.parent.mkdir(parents=True, exist_ok=True)
+    assembled_path = result_path / params['filename']
     chunks = sorted([
         file for file in chunks_path.iterdir()
         if file.name.startswith('chunk_')

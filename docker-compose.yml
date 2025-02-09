@@ -1,6 +1,5 @@
 volumes:
-  pdfs:
-  chunks:
+  files:
   static:
   redis_data:
 
@@ -10,8 +9,7 @@ services:
     container_name: pdfer-backend
     build: ./backend
     volumes:
-      - pdfs:/app/pdfs/
-      - chunks:/app/chunks
+      - files:/app/files
     depends_on:
       - redis
     environment:
@@ -43,8 +41,7 @@ services:
     container_name: pdfer-worker
     build: ./backend
     volumes:
-      - pdfs:/app/pdfs/
-      - chunks:/app/chunks
+      - files:/app/files
     command: celery -A app.tasks worker --loglevel=info
     depends_on:
       - redis

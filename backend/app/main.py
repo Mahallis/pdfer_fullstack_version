@@ -26,12 +26,9 @@ app.add_middleware(
 )
 
 BASE_DIR: Path = Path(__file__).resolve().parent.parent
-PDFS_DIR: Path = BASE_DIR / 'pdfs'
-CHUNKS_DIR: Path = BASE_DIR / 'chunks'
+FILES_DIR: Path = BASE_DIR / 'files'
 
-BASE_DIR.mkdir(parents=True, exist_ok=True)
-PDFS_DIR.mkdir(parents=True, exist_ok=True)
-CHUNKS_DIR.mkdir(parents=True, exist_ok=True)
+FILES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @app.post("/compress/")
@@ -40,11 +37,11 @@ async def compress_file(
     foldername: Annotated[str, Form()],
 ) -> dict:
 
-    folder_path: str = str(PDFS_DIR / foldername)
+    folder_path: Path = FILES_DIR / foldername / 'pdfs'
     try:
         task = compress_pdf.delay(
             compression=int(compression),
-            folder_path=folder_path,
+            folder_path=str(folder_path),
         )
         return {'task_id': task.id}
     except Exception as e:
@@ -82,7 +79,9 @@ async def get_task_status(
             return {"status": "failed", "error": str(task.info)}
     finally:
         if task.state != "PENDING":
-            background_tasks.add_task(lambda: shutil.rmtree(Path(task.result['result_path']).parent))
+            background_tasks.add_task(
+                lambda: shutil.rmtree(Path(task.result['result_path']).parent)
+            )
 
 
 @app.post('/upload-chunk/')
@@ -94,8 +93,11 @@ async def upload_chunk(
     chunk: UploadFile = File(...),
 ):
     clean_filename: str = filename
-    document_path = CHUNKS_DIR / foldername / clean_filename
+    document_path: Path = FILES_DIR / foldername / 'chunks' / clean_filename
+    pdfs_path: Path = FILES_DIR / foldername / 'pdfs'
+
     document_path.mkdir(parents=True, exist_ok=True)
+    pdfs_path.mkdir(parents=True, exist_ok=True)
 
     chunk_path = document_path / f'chunk_{chunk_index:03d}'
     with open(chunk_path, "wb") as f:
@@ -107,7 +109,7 @@ async def upload_chunk(
             'chunks_path': str(document_path),
             'foldername': foldername,
             'total_chunks': total_chunks,
-            'result_path': str(PDFS_DIR),
+            'result_path': str(pdfs_path),
         })
 
         # TODO: Remove foldername folder compressing
