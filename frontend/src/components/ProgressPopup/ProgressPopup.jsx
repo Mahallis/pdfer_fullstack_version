@@ -2,16 +2,32 @@ import { useEffect, useState } from "react";
 import success from "./success.svg";
 import fail from "./fail.svg";
 
-export default function ProgressPopup({ modalState, setModalState }) {
+export default function ProgressPopup({ modalState, setModalState, uploadState }) {
   const [dots, setDots] = useState(".");
+
   useEffect(() => {
     if (modalState.animation === "progress" && modalState.isTriggered) {
       const interval = setInterval(() => {
         setDots((prevDots) => (prevDots.length < 3 ? prevDots + "." : "."));
       }, 1000);
-      return () => clearInterval(interval); // Очищаем интервал при размонтировании
+      return () => {
+        clearInterval(interval); // Очищаем интервал при размонтировании
+      }
     }
   }, [modalState.animation, modalState.isTriggered]);
+
+  let sendAbort = () => {
+    const response = fetch(
+      `/api/cancel_task/${uploadState.taskID}`, {
+        method: 'POST',
+        body: uploadState.files_folder
+      }
+    )
+    if (response.ok) {
+      window.location.reload()
+    }
+  }
+
   let progress = (
     <div className="spinner-border text-primary" role="status">
       <span className="visually-hidden">Loading...</span>
@@ -35,6 +51,7 @@ export default function ProgressPopup({ modalState, setModalState }) {
                 aria-label="Close"
                 onClick={() => {
                   setModalState((prevState) => !prevState.isTriggered);
+                  sendAbort()
                 }}
               ></button>
             </div>

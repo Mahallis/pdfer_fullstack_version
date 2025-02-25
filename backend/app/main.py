@@ -1,14 +1,15 @@
+from asyncio import sleep
 from base64 import b64encode
 from mimetypes import guess_type
 from pathlib import Path
 import shutil
 from typing import Annotated
 
-from fastapi import FastAPI, UploadFile, BackgroundTasks, File, Form
+from fastapi import FastAPI, UploadFile, BackgroundTasks, File, Form, status, Body
 from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from .tasks import compress_pdf, assemble_chunks
+from .tasks import compress_pdf, assemble_chunks, terminate_task
 
 app = FastAPI()
 
@@ -45,7 +46,10 @@ async def compress_file(
         )
         return {'task_id': task.id}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 
 @app.get("/task/{task_id}/")
@@ -58,7 +62,12 @@ async def get_task_status(
     task = compress_pdf.AsyncResult(task_id)
     try:
         if task.state == "PENDING":
-            return {"status": "pending"}
+            return {
+                "status": "pending",
+                "filename": None,
+                'file': None,
+                'mime_type': None
+            }
         elif task.state == "SUCCESS":
             result_path: Path = Path(task.result['result_path'])
             mime_type, _ = guess_type(result_path)
@@ -66,17 +75,22 @@ async def get_task_status(
                 raise ValueError(
                     f"Не удалось определить MIME-тип для файла: {result_path}"
                 )
-
+            is_pdf = mime_type == 'application/pdf'
+            filename = result_path.stem if is_pdf else 'compressed.zip'
             with open(result_path, 'rb') as file:
                 content = file.read()
                 encoded_file = b64encode(content).decode("utf-8")
             return {
                 'status': 'success',
+                'filename': filename,
                 'file': encoded_file,
                 'mime_type': mime_type
             }
         else:
-            return {"status": "failed", "error": str(task.info)}
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=str(task.info)
+            )
     finally:
         if task.state != "PENDING":
             background_tasks.add_task(
@@ -121,3 +135,22 @@ async def upload_chunk(
             f'{chunk_index + 1} of {total_chunks} uploaded.'
             )
         }
+
+
+@app.post('/cancel_task/{task_id}/')
+async def cancel_task(
+    task_id: str,
+    foldername: str = Body(...),
+):
+    terminate_task.delay(
+        task_id=task_id,
+        folder_path=str(FILES_DIR / foldername)
+    )
+    task = terminate_task.AsyncResult(task_id)
+    while True:
+        if task.successful():
+            return {
+                "message": "Task cancelled successfully",
+                "result": task.result
+            }
+        await sleep(3)

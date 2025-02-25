@@ -1,4 +1,5 @@
 import subprocess
+from shutil import rmtree
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -87,10 +88,25 @@ def assemble_chunks(params: dict):
     ])
     if not len(chunks) == params['total_chunks']:
         raise Exception('Not enough chunks')
-    with open(f'{assembled_path}', 'wb') as output_file:
-        for chunk in chunks:
-            with open(chunk, 'rb') as chunk_file:
-                output_file.write(chunk_file.read())
-            chunk.unlink()
-    Path(chunks_path).rmdir()
-    return {'status': 'done'}
+    try:
+        with open(f'{assembled_path}', 'wb') as output_file:
+            for chunk in chunks:
+                with open(chunk, 'rb') as chunk_file:
+                    output_file.write(chunk_file.read())
+                chunk.unlink()
+        Path(chunks_path).rmdir()
+        return {'status': 'done'}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=e
+        )
+
+
+@celery_app.task
+def terminate_task(
+    task_id: str,
+    folder_path: str
+):
+    celery_app.control.revoke(task_id=task_id, terminate=True)
+    rmtree(folder_path)

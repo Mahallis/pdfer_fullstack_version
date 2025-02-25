@@ -1,59 +1,27 @@
-# Общие исключения
-.git
-.gitignore
-.vscode/
-.dockerignore
-Dockerfile
-docker-compose.yml
-
-# Логи и временные файлы
-logs/
-*.log
-__pycache__/
-*.py[cod]
-*.sqlite3
-
-# Файлы IDE
-.vscode/*
-!.vscode/settings.json  # Если нужно сохранить настройки VSCode
-.idea/
-
-# Файлы сборки и кэша
-node_modules/
-dist/
-build/
-coverage/
-htmlcov/
-
-# Файлы тестирования и линтеров
-pytest_cache/
-.mypy_cache/
-.cache/
-.npm/
-.pycache/
-
-# Файлы документации
-docs/
-README.md
+**/__pycache__
+**/.venv
+**/.classpath
+**/.dockerignore
+**/.env
+**/.git
+**/.gitignore
+**/.project
+**/.settings
+**/.toolstarget
+**/.vs
+**/.vscode
+**/*.*proj.user
+**/*.dbmdl
+**/*.jfm
+**/bin
+**/charts
+**/docker-compose*
+**/compose*
+**/Dockerfile*
+**/node_modules
+**/npm-debug.log
+**/obj
+**/secrets.dev.yaml
+**/values.dev.yaml
 LICENSE
-
-# Backend (Python) исключения
-/backend/*.egg-info/
-/backend/.mypy_cache/
-/backend/__pycache__/
-
-# Frontend (React) исключения
-/frontend/node_modules/
-/frontend/build/
-/frontend/dist/
-
-# Nginx конфигурация
-/nginx/logs/
-
-# Redis данные
-/data/
-dump.rdb
-
-# Другие ненужные файлы
-*.DS_Store
-Thumbs.db
+README.md

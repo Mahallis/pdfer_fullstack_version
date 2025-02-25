@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import ProgressPopup from "./ProgressPopup/ProgressPopup";
+import usePolling from "../hooks/usePolling"
 
 export default function CompressForm() {
   const compression = [
@@ -7,10 +8,13 @@ export default function CompressForm() {
     { value: "100", label: "Нормальное сжатие", selected: true },
     { value: "150", label: "Максимальное качество", selected: false },
   ];
-  let taskID;
-  let intervalID;
-  let files_folder;
-  let filenames;
+
+  const [ uploadState, setUploadState ] = useState({
+    taskID: '',
+    intervalID: '',
+    files_folder: '',
+    filenames: [],
+  });
 
   const [modalState, setModalState] = useState({
     isTriggered: false,
@@ -19,6 +23,7 @@ export default function CompressForm() {
   });
 
   const [isDragging, setIsDragging] = useState(false);
+  const [ isProgress, setIsProgress ] = useState(false)
 
   const generateFolderName = () => {
     const uuid = crypto.randomUUID()
@@ -30,7 +35,11 @@ export default function CompressForm() {
     event.preventDefault()
     let chunkSize = 1024 * 1024
     const chunkPromises = []
-    files_folder = generateFolderName()
+    let foldername = generateFolderName()
+    setUploadState((prevState) => ({
+      ...prevState,
+      files_folder: foldername
+    }))
     Array.from(event.target.files).forEach(async (file) => {
       if (file.type === "application/pdf") {
         let totalChunks = Math.ceil(file.size / chunkSize)
@@ -38,13 +47,15 @@ export default function CompressForm() {
           const start = i * chunkSize;
           const end = Math.min((i + 1) * chunkSize, file.size);
           const chunk = file.slice(start, end);
-          chunkPromises.push(uploadChunk(chunk, i, totalChunks, file.name, files_folder))
+          chunkPromises.push(uploadChunk(chunk, i, totalChunks, file.name, foldername))
         }
         await Promise.all(chunkPromises)
+        setIsProgress(false)
       } else {
         alert('Вы загрузили не pdf документ.')
       }
     })
+    return foldername
   }
 
   const uploadChunk = async (chunk, index, total_chunks, filename, foldername) => {
@@ -66,11 +77,8 @@ export default function CompressForm() {
         throw new Error(`Ошибка сервера: ${response.status} ${response.statusText}`);
       }
 
-      const result = await response.json();
-      console.log(result)
-
     } catch (error) {
-      clearInterval(intervalID); // Очистка интервала при ошибке
+      clearInterval(uploadState.intervalID); // Очистка интервала при ошибке
       console.error("Ошибка при отправке формы:", error);
     }
   }
@@ -102,83 +110,25 @@ export default function CompressForm() {
     }
   };
 
-  // Функция для опроса результата задачи
-  const pollResults = async (formData) => {
-    try {
-      const response = await fetch(`/api/task/${taskID}/`);
-      if (!response.ok) {
-        throw new Error(`Ошибка сервера: ${response.status} ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      const { status, file, mime_type } = result;
-
-      switch (status) {
-        case "success":
-          clearInterval(intervalID); // Очистка интервала
-          setModalState({
-              isTriggered: true,
-              animation: 'success',
-              status: "Окно будет закрыто через 3 секунды"
-          })
-          setTimeout(() => {
-              setModalState({
-                isTriggered: false,
-                animation: "",
-                status: ""
-              });
-            }, 3000);
-          if (file) {
-            const fileName = filenames.length > 1
-            ? `${filenames.length}_files_compressed.zip`
-            : `${filenames[0].name.slice(0, -4)}_compressed.pdf`;
-            
-              downloadFile(file, fileName, mime_type);
-          } else {
-            console.error("Файл не найден в ответе сервера.");
-          }
-          break;
-
-        case "failure":
-          clearInterval(intervalID); // Очистка интервала
-          setModalState((prevState) => ({
-            ...prevState,
-            animation: "fail",
-            status: "Произошла ошибка при обработке",
-          }));
-          break;
-
-        case "pending":
-          // Продолжаем опрос
-          break;
-
-        default:
-          console.warn("Неизвестный статус задачи:", status);
-      }
-    } catch (error) {
-      clearInterval(intervalID); // Очистка интервала при ошибке
-      console.error("Ошибка при опросе результатов:", error);
-      setModalState((prevState) => ({
-        ...prevState,
-        animation: "fail",
-        status: "Произошла ошибка при опросе результатов",
-      }));
-    }
-  };
-
   // Обработка отправки формы
   const onSubmitForm = async (event) => {
     event.preventDefault();
     const formData = new FormData(event.target);
-    filenames = formData.getAll("files")
-    formData.delete('files')
-    formData.append('foldername', files_folder)
 
-    setModalState({
+    setUploadState((prevState) => ({
+      ...prevState,
+      filenames: formData.getAll("files")
+    }));
+
+    formData.delete('files')
+    formData.append('foldername', uploadState.files_folder)
+
+    setModalState((prevState) => ({
+      ...prevState,
       isTriggered: true,
       status: "Обработка",
       animation: "progress",
-    });
+    }));
 
     try {
       const response = await fetch("/api/compress/", {
@@ -191,23 +141,66 @@ export default function CompressForm() {
       }
 
       const result = await response.json();
-      taskID = result.task_id;
+      setUploadState((prevState) => ({
+        ...prevState,
+        taskID: result.task_id,
+      }));
 
-      intervalID = setInterval(() => pollResults(formData), 2000);
     } catch (error) {
-      clearInterval(intervalID); // Очистка интервала при ошибке
       console.error("Ошибка при отправке формы:", error);
-      setModalState({
+      setModalState((prevState) => ({
+        ...prevState,
         isTriggered: true,
         animation: "fail",
         status: "Произошла ошибка при отправке формы",
-      });
+      }));
     }
   };
 
+  const onSuccess = useCallback((filename, file, mime_type) => {
+    downloadFile(file, filename, mime_type);
+    setModalState({
+      isTriggered: true,
+      animation: "success",
+      status: "Окно будет закрыто через 3 секунды",
+    });
+
+    setTimeout(() => {
+      setModalState({
+        isTriggered: false,
+        animation: "",
+        status: "",
+      });
+    }, 3000);
+  }, [setModalState])
+
+  const onFailure = useCallback(() => {
+    setModalState({
+      isTriggered: true,
+      animation: "fail",
+      status: "Произошла ошибка при обработке",
+    });
+  }, [setModalState])
+
+  const onPending = useCallback(() => {
+    setModalState({
+      isTriggered: true,
+      animation: "progress",
+      status: "Обработка...",
+    });
+  }, [setModalState])
+
+  usePolling(
+    uploadState.taskID,
+    modalState.isTriggered,
+    onSuccess,
+    onFailure,
+    onPending
+  );
+
   return (
     <>
-      <ProgressPopup modalState={modalState} setModalState={setModalState} />
+      <ProgressPopup modalState={modalState} setModalState={setModalState} uploadState={uploadState} />
       <div className="card col-xl-6 position-relative">
         <h3 className="text-center card-header">Уменьшение размера PDF файлов</h3>
         <div className="card-body d-flex flex-column">
@@ -237,7 +230,7 @@ export default function CompressForm() {
                     name="compression"
                   >
                     {compression.map((option) => (
-                      <option key={option.value} value={option.value} selected={option.selected}>
+                      <option key={option.value} value={option.value} defaultValue={option.selected}>
                         {option.label}
                       </option>
                     ))}
@@ -258,14 +251,17 @@ export default function CompressForm() {
                   name="files"
                   multiple
                   style={{ border: isDragging && "4px solid red" }}
-                  onChange={createChunks}
+                  onChange={(event) => {
+                    setIsProgress(true)
+                    createChunks(event)
+                  }}
                   required
                 />
               </div>
             </div>
             <div className="row mt-5">
-              <button className="btn btn-primary" type="submit">
-                Сжать документы
+              <button className="btn btn-primary" type="submit" disabled={isProgress}>
+                { isProgress ? 'Загрузка файлов' : 'Сжать документы' }
               </button>
             </div>
           </form>
