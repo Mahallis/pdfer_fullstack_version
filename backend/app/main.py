@@ -5,7 +5,15 @@ from pathlib import Path
 import shutil
 from typing import Annotated
 
-from fastapi import FastAPI, UploadFile, BackgroundTasks, File, Form, status, Body
+from fastapi import (
+    FastAPI,
+    UploadFile,
+    BackgroundTasks,
+    File,
+    Form,
+    status,
+    Body,
+)
 from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 

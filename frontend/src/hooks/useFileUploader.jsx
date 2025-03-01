@@ -1,8 +1,6 @@
-import { useState } from "react";
-
-export const useFileUploader = () => {
-  const [isUploading, setIsUploading] = useState(false);
-  const [errorDetails, setError] = useState(null);
+export const useFileUploader = (uploadState, toggleProgress) => {
+  let files = uploadState.files
+  let foldername = uploadState.files_folder
 
   const uploadChunk = async (chunk, index, totalChunks, filename, foldername) => {
     const formData = new FormData();
@@ -25,19 +23,18 @@ export const useFileUploader = () => {
       const result = await response.json();
       console.log(result);
     } catch (err) {
-      setError(err.message);
       console.error("Ошибка при отправке чанка:", err);
     }
   };
 
-  const createChunksAndUpload = async (files, foldername) => {
-    setIsUploading(true);
+  const createChunksAndUpload = async () => {
+    toggleProgress(true);
     const chunkSize = 1024 * 1024; // 1 MB
     const promises = [];
 
     for (const file of files) {
       if (file.type !== "application/pdf") {
-        setError("Загружены не PDF-файлы.");
+        alert("Загружены не PDF-файлы.");
         return;
       }
 
@@ -52,8 +49,7 @@ export const useFileUploader = () => {
     }
 
     await Promise.all(promises);
-    setIsUploading(false);
+    toggleProgress(false);
   };
-
-  return { isUploading, error: errorDetails, createChunksAndUpload };
+  createChunksAndUpload()
 };

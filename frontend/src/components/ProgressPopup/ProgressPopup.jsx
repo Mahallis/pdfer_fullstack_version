@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import success from "./success.svg";
 import fail from "./fail.svg";
 
-export default function ProgressPopup({ modalState, setModalState, uploadState }) {
+export default function ProgressPopup({ 
+  modalState,
+  setModalState,
+  uploadState,
+  fileInputValueRef,
+}) {
   const [dots, setDots] = useState(".");
 
   useEffect(() => {
@@ -11,7 +16,7 @@ export default function ProgressPopup({ modalState, setModalState, uploadState }
         setDots((prevDots) => (prevDots.length < 3 ? prevDots + "." : "."));
       }, 1000);
       return () => {
-        clearInterval(interval); // Очищаем интервал при размонтировании
+        clearInterval(interval);
       }
     }
   }, [modalState.animation, modalState.isTriggered]);
@@ -24,7 +29,7 @@ export default function ProgressPopup({ modalState, setModalState, uploadState }
       }
     )
     if (response.ok) {
-      window.location.reload()
+      fileInputValueRef.current.value = null
     }
   }
 

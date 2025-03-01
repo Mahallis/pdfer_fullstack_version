@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import ProgressPopup from "./ProgressPopup/ProgressPopup";
 import usePolling from "../hooks/usePolling"
 
@@ -9,7 +9,7 @@ export default function CompressForm() {
     { value: "150", label: "Максимальное качество", selected: false },
   ];
 
-  const [ uploadState, setUploadState ] = useState({
+  const [uploadState, setUploadState] = useState({
     taskID: '',
     intervalID: '',
     files_folder: '',
@@ -23,7 +23,11 @@ export default function CompressForm() {
   });
 
   const [isDragging, setIsDragging] = useState(false);
-  const [ isProgress, setIsProgress ] = useState(false)
+  const [progressState, setProgressState] = useState({
+    progressValue: 0,
+    isProgress: false,
+  })
+  const fileInputValueRef = useRef(null)
 
   const generateFolderName = () => {
     const uuid = crypto.randomUUID()
@@ -31,31 +35,41 @@ export default function CompressForm() {
     return `${uuid}_${timestamp}`
   }
 
-  const createChunks = (event) => {
-    event.preventDefault()
-    let chunkSize = 1024 * 1024
-    const chunkPromises = []
-    let foldername = generateFolderName()
+  const createChunks = async (event) => {
+    const chunkSize = 1024 * 1024
+    const files = Array.from(event.target.files)
+    const totalChunks = files.reduce((acc, curr) => acc + Math.ceil(curr.size / (1024 ** 2)), 0)
+    const step = Math.round((100 / totalChunks) * 1000) / 1000
+    const foldername = generateFolderName()
+
     setUploadState((prevState) => ({
       ...prevState,
-      files_folder: foldername
+      files_folder: foldername,
     }))
-    Array.from(event.target.files).forEach(async (file) => {
+
+    for (const file of files) {
       if (file.type === "application/pdf") {
-        let totalChunks = Math.ceil(file.size / chunkSize)
-        for (let i = 0; i < totalChunks; i++) {
+        let fileChunks = Math.ceil(file.size / chunkSize)
+        for (let i = 0; i < fileChunks; i++) {
           const start = i * chunkSize;
           const end = Math.min((i + 1) * chunkSize, file.size);
           const chunk = file.slice(start, end);
-          chunkPromises.push(uploadChunk(chunk, i, totalChunks, file.name, foldername))
+          await uploadChunk(chunk, i, fileChunks, file.name, foldername)
+          setProgressState((prevState) => ({
+            ...prevState,
+            progressValue: prevState.progressValue < 100 
+              ? Math.round((prevState.progressValue + step) * 100) / 100 
+              : 100
+          }))
         }
-        await Promise.all(chunkPromises)
-        setIsProgress(false)
       } else {
         alert('Вы загрузили не pdf документ.')
       }
-    })
-    return foldername
+    }
+    setProgressState(() => ({
+      progressValue: 0,
+      isProgress: false
+    }))
   }
 
   const uploadChunk = async (chunk, index, total_chunks, filename, foldername) => {
@@ -186,7 +200,7 @@ export default function CompressForm() {
     setModalState({
       isTriggered: true,
       animation: "progress",
-      status: "Обработка...",
+      status: "Обработка",
     });
   }, [setModalState])
 
@@ -200,7 +214,12 @@ export default function CompressForm() {
 
   return (
     <>
-      <ProgressPopup modalState={modalState} setModalState={setModalState} uploadState={uploadState} />
+      <ProgressPopup 
+        modalState={modalState}
+        setModalState={setModalState}
+        uploadState={uploadState}
+        fileInputValueRef={fileInputValueRef}
+      />
       <div className="card col-xl-6 position-relative">
         <h3 className="text-center card-header">Уменьшение размера PDF файлов</h3>
         <div className="card-body d-flex flex-column">
@@ -239,8 +258,7 @@ export default function CompressForm() {
                 </div>
               </div>
             </div>
-            <div className="row">
-              <div className="col floating-group input-group-lg">
+              <div className="floating-group input-group-lg">
                 <label htmlFor="formFileMultiple" className="form-label">
                   Загрузите один или несколько PDF файлов
                 </label>
@@ -249,19 +267,26 @@ export default function CompressForm() {
                   type="file"
                   id="formFileMultiple"
                   name="files"
+                  ref={fileInputValueRef.current}
                   multiple
                   style={{ border: isDragging && "4px solid red" }}
                   onChange={(event) => {
-                    setIsProgress(true)
+                    setProgressState((prevState) => ({
+                      ...prevState,
+                      isProgress: true
+                    }))
                     createChunks(event)
                   }}
                   required
                 />
               </div>
-            </div>
-            <div className="row mt-5">
-              <button className="btn btn-primary" type="submit" disabled={isProgress}>
-                { isProgress ? 'Загрузка файлов' : 'Сжать документы' }
+              <div className="progress mt-3" role="progressbar" aria-valuenow={progressState.progressValue} aria-valuemin="0" aria-valuemax="100" 
+                style={{height: "40px", opacity: progressState.isProgress ? '100' : '0'}}>
+                <div className="progress-bar progress-bar-striped progress-bar-animated" style={{width: `${progressState.progressValue}%`}}></div>
+              </div>
+            <div className="row mt-4">
+              <button className="btn btn-primary" type="submit" disabled={progressState.isProgress}>
+                { progressState.isProgress ? 'Загрузка файлов' : 'Сжать документы' }
               </button>
             </div>
           </form>
