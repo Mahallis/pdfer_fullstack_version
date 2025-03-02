@@ -76,12 +76,16 @@ async def get_task_status(
                 'file': None,
                 'mime_type': None
             }
-        elif task.state == "SUCCESS":
+        elif (
+            task.state == "SUCCESS" and
+            not isinstance(task.result, BaseException)
+        ):
             result_path: Path = Path(task.result['result_path'])
             mime_type, _ = guess_type(result_path)
             if not mime_type:
                 raise ValueError(
-                    f"Не удалось определить MIME-тип для файла: {result_path}"
+                    "Не удалось определить MIME-тип"
+                    f"для файла: {result_path}"
                 )
             is_pdf = mime_type == 'application/pdf'
             filename = result_path.stem if is_pdf else 'compressed.zip'
@@ -100,9 +104,13 @@ async def get_task_status(
                 detail=str(task.info)
             )
     finally:
-        if task.state != "PENDING":
+        if (
+            task.state != "PENDING" and
+            not isinstance(task.result, BaseException)
+        ):
+            result_path = (task.result['result_path']).parent
             background_tasks.add_task(
-                lambda: shutil.rmtree(Path(task.result['result_path']).parent)
+                lambda: shutil.rmtree(result_path)
             )
 
 
@@ -133,8 +141,6 @@ async def upload_chunk(
             'total_chunks': total_chunks,
             'result_path': str(pdfs_path),
         })
-
-        # TODO: Remove foldername folder compressing
         return {'task_id': task.id}
     return {
         "status": "success",

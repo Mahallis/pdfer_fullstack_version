@@ -56,7 +56,9 @@ export default function ProgressPopup({
                 aria-label="Close"
                 onClick={() => {
                   setModalState((prevState) => !prevState.isTriggered);
-                  sendAbort()
+                  if (modalState.animation !== "success") {
+                    sendAbort()
+                  }
                 }}
               ></button>
             </div>

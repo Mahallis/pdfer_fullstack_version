@@ -64,6 +64,7 @@ export default function CompressForm() {
         }
       } else {
         alert('Вы загрузили не pdf документ.')
+        window.location.reload()
       }
     }
     setProgressState(() => ({
@@ -176,7 +177,7 @@ export default function CompressForm() {
     setModalState({
       isTriggered: true,
       animation: "success",
-      status: "Окно будет закрыто через 3 секунды",
+      status: "Окно будет закрыто через 5 секунды",
     });
 
     setTimeout(() => {
@@ -185,7 +186,7 @@ export default function CompressForm() {
         animation: "",
         status: "",
       });
-    }, 3000);
+    }, 5000);
   }, [setModalState])
 
   const onFailure = useCallback(() => {
