@@ -2,12 +2,8 @@ import { useEffect, useState } from "react";
 import success from "./success.svg";
 import fail from "./fail.svg";
 
-export default function ProgressPopup({ 
-  modalState,
-  setModalState,
-  uploadState,
-  fileInputValueRef,
-}) {
+export default function ProgressPopup({ props }) {
+  const { modalState, setModalState, uploadState, fileInputValueRef } = props
   const [dots, setDots] = useState(".");
 
   useEffect(() => {

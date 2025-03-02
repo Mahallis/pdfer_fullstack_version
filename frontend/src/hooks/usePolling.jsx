@@ -16,11 +16,11 @@ export default function usePolling (taskID, isTriggered, onSuccess, onFailure, o
 
                     switch (status) {
                         case "success":
-                            clearInterval(intervalRef)
+                            clearInterval(intervalRef.current)
                             onSuccess(filename, file, mime_type)
                             break
                         case "failure":
-                            clearInterval(intervalRef)
+                            clearInterval(intervalRef.current)
                             onFailure()
                             break
                         case "pending":
@@ -36,7 +36,7 @@ export default function usePolling (taskID, isTriggered, onSuccess, onFailure, o
             };
             intervalRef.current = setInterval(poll, 5000);
 
-            return () => clearInterval(intervalRef.current)
         }
+        return () => clearInterval(intervalRef.current)
     }, [taskID, isTriggered, onSuccess, onFailure, onPending])
 };

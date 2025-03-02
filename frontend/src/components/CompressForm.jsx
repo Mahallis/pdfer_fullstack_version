@@ -1,6 +1,9 @@
 import { useCallback, useState, useRef } from "react";
+
 import ProgressPopup from "./ProgressPopup/ProgressPopup";
 import usePolling from "../hooks/usePolling"
+import { createChunks } from "../utils/uploadFile";
+import { downloadFile } from "../utils/downloadFile";
 
 export default function CompressForm() {
   const compression = [
@@ -22,111 +25,23 @@ export default function CompressForm() {
     animation: "progress",
   });
 
-  const [isDragging, setIsDragging] = useState(false);
   const [progressState, setProgressState] = useState({
     progressValue: 0,
     isProgress: false,
   })
   const fileInputValueRef = useRef(null)
 
-  const generateFolderName = () => {
-    const uuid = crypto.randomUUID()
-    const timestamp = Date.now()
-    return `${uuid}_${timestamp}`
-  }
-
-  const createChunks = async (event) => {
-    const chunkSize = 1024 * 1024
-    const files = Array.from(event.target.files)
-    const totalChunks = files.reduce((acc, curr) => acc + Math.ceil(curr.size / (1024 ** 2)), 0)
-    const step = Math.round((100 / totalChunks) * 1000) / 1000
-    const foldername = generateFolderName()
-
-    setUploadState((prevState) => ({
+  const onChangeHandler = (event) => {
+    setProgressState((prevState) => ({
       ...prevState,
-      files_folder: foldername,
+      isProgress: true
     }))
-
-    for (const file of files) {
-      if (file.type === "application/pdf") {
-        let fileChunks = Math.ceil(file.size / chunkSize)
-        for (let i = 0; i < fileChunks; i++) {
-          const start = i * chunkSize;
-          const end = Math.min((i + 1) * chunkSize, file.size);
-          const chunk = file.slice(start, end);
-          await uploadChunk(chunk, i, fileChunks, file.name, foldername)
-          setProgressState((prevState) => ({
-            ...prevState,
-            progressValue: prevState.progressValue < 100 
-              ? Math.round((prevState.progressValue + step) * 100) / 100 
-              : 100
-          }))
-        }
-      } else {
-        alert('Вы загрузили не pdf документ.')
-        window.location.reload()
-      }
-    }
-    setProgressState(() => ({
-      progressValue: 0,
-      isProgress: false
-    }))
+    createChunks(event, setUploadState, setProgressState, uploadState)
   }
 
-  const uploadChunk = async (chunk, index, total_chunks, filename, foldername) => {
-    const formData = new FormData();
-    formData.append('chunk', chunk)
-    formData.append('chunk_index', index)
-    formData.append('total_chunks', total_chunks)
-    formData.append('filename', filename)
-    formData.append('foldername', foldername)
-
-
-    try {
-      const response = await fetch("/api/upload-chunk/", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Ошибка сервера: ${response.status} ${response.statusText}`);
-      }
-
-    } catch (error) {
-      clearInterval(uploadState.intervalID); // Очистка интервала при ошибке
-      console.error("Ошибка при отправке формы:", error);
-    }
-  }
-
-  // Функция для скачивания файла
-  const downloadFile = (fileData, fileName, mime_type) => {
-    try {
-      const byteString = atob(fileData);
-
-      const arrayBuffer = new ArrayBuffer(byteString.length);
-      const uint8Array = new Uint8Array(arrayBuffer);
-
-      for (let i = 0; i < byteString.length; i++) {
-        uint8Array[i] = byteString.charCodeAt(i);
-      }
-
-      const blob = new Blob([uint8Array], { type: mime_type });
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = downloadUrl;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(downloadUrl);
-      fileInputValueRef.current = null
-    } catch (error) {
-      console.error("Ошибка при скачивании файла:", error);
-    }
-  };
-
-  // Обработка отправки формы
   const onSubmitForm = async (event) => {
+    // Form submit hanler fuction
+
     event.preventDefault();
     const formData = new FormData(event.target);
 
@@ -138,12 +53,11 @@ export default function CompressForm() {
     formData.delete('files')
     formData.append('foldername', uploadState.files_folder)
 
-    setModalState((prevState) => ({
-      ...prevState,
+    setModalState({
       isTriggered: true,
       status: "Обработка",
       animation: "progress",
-    }));
+    });
 
     try {
       const response = await fetch("/api/compress/", {
@@ -163,17 +77,16 @@ export default function CompressForm() {
 
     } catch (error) {
       console.error("Ошибка при отправке формы:", error);
-      setModalState((prevState) => ({
-        ...prevState,
+      setModalState({
         isTriggered: true,
         animation: "fail",
         status: "Произошла ошибка при отправке формы",
-      }));
+      });
     }
   };
 
   const onSuccess = useCallback((filename, file, mime_type) => {
-    downloadFile(file, filename, mime_type);
+    downloadFile(file, filename, mime_type, fileInputValueRef);
     setModalState({
       isTriggered: true,
       animation: "success",
@@ -215,31 +128,14 @@ export default function CompressForm() {
 
   return (
     <>
-      <ProgressPopup 
-        modalState={modalState}
-        setModalState={setModalState}
-        uploadState={uploadState}
-        fileInputValueRef={fileInputValueRef}
-      />
+      <ProgressPopup props={{ modalState, setModalState, uploadState, fileInputValueRef }}/>
       <div className="card col-xl-6 position-relative">
         <h3 className="text-center card-header">Уменьшение размера PDF файлов</h3>
         <div className="card-body d-flex flex-column">
           <h6 className="text-center card-title mb-3">
             Чем выше степень сжатия, тем меньше размер итогового файла
           </h6>
-          <form
-            className="container"
-            onSubmit={onSubmitForm}
-            onDragEnter={(event) => {
-              event.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={(event) => {
-              event.preventDefault();
-              setIsDragging(false);
-            }}
-            onDragOver={(event) => event.preventDefault()}
-          >
+          <form className="container" onSubmit={onSubmitForm}>
             <div className="row">
               <div className="col">
                 <div className="form-floating">
@@ -265,19 +161,12 @@ export default function CompressForm() {
                 </label>
                 <input
                   className="form-control"
-                  type="file"
-                  id="formFileMultiple"
+                  id="file"
                   name="files"
+                  type="file"
                   ref={fileInputValueRef.current}
                   multiple
-                  style={{ border: isDragging && "4px solid red" }}
-                  onChange={(event) => {
-                    setProgressState((prevState) => ({
-                      ...prevState,
-                      isProgress: true
-                    }))
-                    createChunks(event)
-                  }}
+                  onChange={onChangeHandler}
                   required
                 />
               </div>
