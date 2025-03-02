@@ -119,7 +119,7 @@ export default function CompressForm() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(downloadUrl);
-      window.location.reload()
+      fileInputValueRef.current = null
     } catch (error) {
       console.error("Ошибка при скачивании файла:", error);
     }
