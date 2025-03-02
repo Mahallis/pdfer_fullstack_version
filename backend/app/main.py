@@ -108,9 +108,9 @@ async def get_task_status(
             task.state != "PENDING" and
             not isinstance(task.result, BaseException)
         ):
-            result_path = (task.result['result_path']).parent
+            result_path = task.result['result_path']
             background_tasks.add_task(
-                lambda: shutil.rmtree(result_path)
+                lambda: shutil.rmtree(Path(result_path).parent)
             )
 
 
