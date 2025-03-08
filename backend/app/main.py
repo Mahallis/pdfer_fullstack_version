@@ -1,23 +1,23 @@
+import shutil
 from asyncio import sleep
 from base64 import b64encode
 from mimetypes import guess_type
 from pathlib import Path
-import shutil
 from typing import Annotated
 
 from fastapi import (
-    FastAPI,
-    UploadFile,
     BackgroundTasks,
+    Body,
+    FastAPI,
     File,
     Form,
+    UploadFile,
     status,
-    Body,
 )
 from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from .tasks import compress_pdf, assemble_chunks, terminate_task
+from .tasks import assemble_chunks, compress_pdf, terminate_task
 
 app = FastAPI()
 
@@ -35,7 +35,7 @@ app.add_middleware(
 )
 
 BASE_DIR: Path = Path(__file__).resolve().parent.parent
-FILES_DIR: Path = BASE_DIR / 'files'
+FILES_DIR: Path = BASE_DIR / "files"
 
 FILES_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -45,26 +45,21 @@ async def compress_file(
     compression: Annotated[int, Form(ge=69, le=150)],
     foldername: Annotated[str, Form()],
 ) -> dict:
-
-    folder_path: Path = FILES_DIR / foldername / 'pdfs'
+    folder_path: Path = FILES_DIR / foldername / "pdfs"
     try:
         task = compress_pdf.delay(
             compression=int(compression),
             folder_path=str(folder_path),
         )
-        return {'task_id': task.id}
+        return {"task_id": task.id}
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
 
 
 @app.get("/task/{task_id}/")
-async def get_task_status(
-    background_tasks: BackgroundTasks,
-    task_id: str
-):
+async def get_task_status(background_tasks: BackgroundTasks, task_id: str):
     """Get status of a task"""
 
     task = compress_pdf.AsyncResult(task_id)
@@ -73,48 +68,38 @@ async def get_task_status(
             return {
                 "status": "pending",
                 "filename": None,
-                'file': None,
-                'mime_type': None
+                "file": None,
+                "mime_type": None,
             }
-        elif (
-            task.state == "SUCCESS" and
-            not isinstance(task.result, BaseException)
-        ):
-            result_path: Path = Path(task.result['result_path'])
+        elif task.state == "SUCCESS" and not isinstance(task.result, BaseException):
+            result_path: Path = Path(task.result["result_path"])
             mime_type, _ = guess_type(result_path)
             if not mime_type:
                 raise ValueError(
-                    "Не удалось определить MIME-тип"
-                    f"для файла: {result_path}"
+                    f"Не удалось определить MIME-типдля файла: {result_path}"
                 )
-            is_pdf = mime_type == 'application/pdf'
-            filename = result_path.stem if is_pdf else 'compressed.zip'
-            with open(result_path, 'rb') as file:
+            is_pdf = mime_type == "application/pdf"
+            filename = result_path.stem if is_pdf else "compressed.zip"
+            with open(result_path, "rb") as file:
                 content = file.read()
                 encoded_file = b64encode(content).decode("utf-8")
             return {
-                'status': 'success',
-                'filename': filename,
-                'file': encoded_file,
-                'mime_type': mime_type
+                "status": "success",
+                "filename": filename,
+                "file": encoded_file,
+                "mime_type": mime_type,
             }
         else:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=str(task.info)
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(task.info)
             )
     finally:
-        if (
-            task.state != "PENDING" and
-            not isinstance(task.result, BaseException)
-        ):
-            result_path = task.result['result_path']
-            background_tasks.add_task(
-                lambda: shutil.rmtree(Path(result_path).parent)
-            )
+        if task.state != "PENDING" and not isinstance(task.result, BaseException):
+            result_path = task.result["result_path"]
+            background_tasks.add_task(lambda: shutil.rmtree(Path(result_path).parent))
 
 
-@app.post('/upload-chunk/')
+@app.post("/upload-chunk/")
 async def upload_chunk(
     chunk_index: Annotated[int, Form(ge=0)],
     total_chunks: Annotated[int, Form(ge=1)],
@@ -123,48 +108,43 @@ async def upload_chunk(
     chunk: UploadFile = File(...),
 ):
     clean_filename: str = filename
-    document_path: Path = FILES_DIR / foldername / 'chunks' / clean_filename
-    pdfs_path: Path = FILES_DIR / foldername / 'pdfs'
+    document_path: Path = FILES_DIR / foldername / "chunks" / clean_filename
+    pdfs_path: Path = FILES_DIR / foldername / "pdfs"
 
     document_path.mkdir(parents=True, exist_ok=True)
     pdfs_path.mkdir(parents=True, exist_ok=True)
 
-    chunk_path = document_path / f'chunk_{chunk_index:03d}'
+    chunk_path = document_path / f"chunk_{chunk_index:03d}"
     with open(chunk_path, "wb") as f:
         f.write(await chunk.read())
 
     if sum(1 for _ in document_path.iterdir()) == total_chunks:
-        task = assemble_chunks.delay({
-            'filename': filename,
-            'chunks_path': str(document_path),
-            'foldername': foldername,
-            'total_chunks': total_chunks,
-            'result_path': str(pdfs_path),
-        })
-        return {'task_id': task.id}
+        task = assemble_chunks.delay(
+            {
+                "filename": filename,
+                "chunks_path": str(document_path),
+                "foldername": foldername,
+                "total_chunks": total_chunks,
+                "result_path": str(pdfs_path),
+            }
+        )
+        return {"task_id": task.id}
     return {
         "status": "success",
         "message": (
-            f'Chunk {clean_filename}:'
-            f'{chunk_index + 1} of {total_chunks} uploaded.'
-            )
-        }
+            f"Chunk {clean_filename}:{chunk_index + 1} of {total_chunks} uploaded."
+        ),
+    }
 
 
-@app.post('/cancel_task/{task_id}/')
+@app.post("/cancel_task/{task_id}/")
 async def cancel_task(
     task_id: str,
     foldername: str = Body(...),
 ):
-    terminate_task.delay(
-        task_id=task_id,
-        folder_path=str(FILES_DIR / foldername)
-    )
+    terminate_task.delay(task_id=task_id, folder_path=str(FILES_DIR / foldername))
     task = terminate_task.AsyncResult(task_id)
     while True:
         if task.successful():
-            return {
-                "message": "Task cancelled successfully",
-                "result": task.result
-            }
+            return {"message": "Task cancelled successfully", "result": task.result}
         await sleep(3)

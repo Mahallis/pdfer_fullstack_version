@@ -170,7 +170,7 @@ export default function CompressForm() {
                   required
                 />
               </div>
-              <div className="progress mt-3" role="progressbar" aria-valuenow={progressState.progressValue} aria-valuemin="0" aria-valuemax="100" 
+              <div className="progress mt-3" role="progressbar" aria-valuenow={progressState.progressValue} aria-valuemin="0" aria-valuemax="100"
                 style={{height: "40px", opacity: progressState.isProgress ? '100' : '0'}}>
                 <div className="progress-bar progress-bar-striped progress-bar-animated" style={{width: `${progressState.progressValue}%`}}></div>
               </div>

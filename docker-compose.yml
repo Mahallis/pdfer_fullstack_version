@@ -3,7 +3,6 @@ volumes:
   static:
   redis_data:
 
-
 services:
   backend:
     container_name: pdfer-backend
@@ -45,6 +44,17 @@ services:
     command: celery -A app.tasks worker --loglevel=info
     depends_on:
       - redis
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+  beat_worker:
+    container_name: pdfer-beat-worker
+    build: ./backend
+    volumes:
+      - files:/app/files
+    command: celery -A app.scheduled_tasks beat
+    depends_on:
+      - worker
     environment:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
