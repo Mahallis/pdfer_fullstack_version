@@ -2,8 +2,8 @@ from datetime import datetime, time, timedelta
 from os import PathLike, listdir, path
 from shutil import rmtree
 
-from .main import FILES_DIR
-from .tasks import celery_app
+from app.celery.tasks import celery_app
+from app.main import FILES_DIR
 
 TIME_LIMIT = 300.0
 

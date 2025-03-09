@@ -3,15 +3,16 @@ from pathlib import Path
 from shutil import rmtree
 from zipfile import ZipFile
 
-from celery import Celery
 from fastapi import status
 from fastapi.exceptions import HTTPException
+
+from celery import Celery
 
 celery_app = Celery(
     "compress",
     broker="redis://redis:6379/0",
     backend="redis://redis:6379/0",
-    include=["app.scheduled_tasks"],
+    include=["app.celery.scheduled_tasks"],
 )
 
 

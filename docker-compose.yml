@@ -41,7 +41,7 @@ services:
     build: ./backend
     volumes:
       - files:/app/files
-    command: celery -A app.tasks worker --loglevel=info
+    command: celery -A app.celery.tasks worker --loglevel=info
     depends_on:
       - redis
     environment:
@@ -52,7 +52,7 @@ services:
     build: ./backend
     volumes:
       - files:/app/files
-    command: celery -A app.scheduled_tasks beat
+    command: celery -A app.celery.scheduled_tasks beat
     depends_on:
       - worker
     environment:

@@ -17,7 +17,7 @@ from fastapi import (
 from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from .tasks import assemble_chunks, compress_pdf, terminate_task
+from .celery.tasks import assemble_chunks, compress_pdf, terminate_task
 
 app = FastAPI()
 
